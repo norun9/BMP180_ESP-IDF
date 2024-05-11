@@ -80,7 +80,6 @@ static esp_err_t read_temperature_registers(i2c_port_t i2c_num, uint8_t reg, uin
 static esp_err_t bmp180_read_uncompensated_temperature_value(int16_t *ut)
 {
   // write 0x2E into reg 0xF4
-  // 制御レジスタアドレス（0xF4）と温度読み取りコマンド（0x2E）の2つの要素が含まれてる配列全体をI2Cバスに書き込むことで、BMP180に対して正しい制御コマンドを送信している
   uint8_t data_wr[2] = {CONTROL_REGISTER_ADDR, READ_TEMPERATURE_ADDR};
   esp_err_t ret = bmp180_master_write_slave(I2C_NUM_0, data_wr, 2);
   if (ret != ESP_OK)
@@ -122,7 +121,6 @@ static esp_err_t read_pressure_registers(i2c_port_t i2c_num, uint8_t reg, uint8_
 static esp_err_t bmp180_read_uncompensated_pressure_value(uint32_t *up)
 {
   // write 0x34 + (oss << 6) into reg 0xF4
-  // TODO:BMP180_READ_PRESSURE_CMD + (oversampling << 6)の演算について確認
   esp_err_t ret;
   uint8_t data_wr[] = {CONTROL_REGISTER_ADDR, READ_PRESSURE_ADDR};
   ret = bmp180_master_write_slave(I2C_NUM_0, data_wr, 2);
@@ -159,9 +157,8 @@ static esp_err_t bmp180_read_uncompensated_pressure_value(uint32_t *up)
 static esp_err_t bmp180_read_coefficients(i2c_port_t i2c_num, uint8_t *coefficients)
 {
   esp_err_t ret;
-  uint8_t reg_addr = BMP180_CALIB_DATA_START; // 校正データの開始レジスタアドレス
+  uint8_t reg_addr = BMP180_CALIB_DATA_START;
 
-  // 書き込み操作：校正データの開始レジスタアドレスをセット
   ret = bmp180_master_write_slave(i2c_num, &reg_addr, 1);
   if (ret != ESP_OK)
   {
@@ -169,7 +166,6 @@ static esp_err_t bmp180_read_coefficients(i2c_port_t i2c_num, uint8_t *coefficie
     return ret;
   }
 
-  // 読み取り操作：校正データの読み取り
   ret = bmp180_master_read_slave(i2c_num, coefficients, BMP180_CALIB_DATA_SIZE);
   if (ret != ESP_OK)
   {
@@ -177,33 +173,12 @@ static esp_err_t bmp180_read_coefficients(i2c_port_t i2c_num, uint8_t *coefficie
     return ret;
   }
 
-  return ESP_OK; // 校正データの読み取りが成功
+  return ESP_OK;
 }
-
-// static esp_err_t bmp180_read_coefficients(i2c_port_t i2c_num, uint8_t *coefficients)
-// {
-//   i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-//   esp_err_t ret;
-//   i2c_master_start(cmd);
-//   i2c_master_write_byte(cmd, (BMP180_ADDRESS << 1) | I2C_MASTER_WRITE, ACK_CHECK_EN);
-//   i2c_master_write_byte(cmd, BMP180_CALIB_DATA_START, ACK_CHECK_EN); // 校正データの開始レジスタアドレス
-//   i2c_master_start(cmd);
-//   i2c_master_write_byte(cmd, (BMP180_ADDRESS << 1) | I2C_MASTER_READ, ACK_CHECK_EN); // 読み取りモードでアドレス送信
-//   if (coefficients != NULL)
-//   {
-//     i2c_master_read(cmd, coefficients, BMP180_CALIB_DATA_SIZE - 1, I2C_MASTER_ACK);
-//     i2c_master_read_byte(cmd, coefficients + BMP180_CALIB_DATA_SIZE - 1, I2C_MASTER_NACK);
-//   }
-//   i2c_master_stop(cmd);
-//   ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_PERIOD_MS);
-//   i2c_cmd_link_delete(cmd);
-
-//   return ret;
-// }
 
 void parse_bmp180_coefficients(uint8_t *coefficients)
 {
-  AC1 = (coefficients[0] << 8) | coefficients[1]; // TODO:LSB,MSBの計算よく出てくるが、なぜこれで値が出るの？
+  AC1 = (coefficients[0] << 8) | coefficients[1];
   AC2 = (coefficients[2] << 8) | coefficients[3];
   AC3 = (coefficients[4] << 8) | coefficients[5];
   AC4 = (coefficients[6] << 8) | coefficients[7];
@@ -219,51 +194,10 @@ void parse_bmp180_coefficients(uint8_t *coefficients)
            AC1, AC2, AC3, AC4, AC5, AC6, B1, B2, MB, MC, MD);
 }
 
-// static esp_err_t read_chip_id(uint8_t *chip_id)
-// {
-//   i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-//   esp_err_t ret;
-
-//   // I2C通信の開始を示すスタートコンディションを送信
-//   i2c_master_start(cmd);
-//   // BMP180のI2Cスレーブアドレスを設定し、書き込み操作を指示するためのビット（I2C_MASTER_WRITE:0）を追加
-//   i2c_master_write_byte(cmd, (BMP180_ADDRESS << 1) | I2C_MASTER_WRITE, ACK_CHECK_EN); // OxEE | 0 でOxEE(write)になる
-//   // チップIDが格納されているレジスタのアドレスをデバイスに送信
-//   i2c_master_write_byte(cmd, CHIP_ID_REG_ADDR, ACK_CHECK_EN);
-
-//   // リピートスタートコンディションを送信し、続けて読み取り操作を指示
-//   i2c_master_start(cmd);
-//   // BMP180のアドレスに読み取りビットを追加して送信
-//   i2c_master_write_byte(cmd, (BMP180_ADDRESS << 1) | I2C_MASTER_READ, ACK_CHECK_EN); // OxEE | 1で0xEF(read)になる
-//   // チップIDを読み取る
-//   i2c_master_read_byte(cmd, chip_id, I2C_MASTER_LAST_NACK);
-//   // I2C通信の終了を示すストップコンディションを送信
-//   i2c_master_stop(cmd);
-//   // コマンドキューに格納された全てのI2Cコマンドを実行します
-//   ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_PERIOD_MS);
-//   // コマンドリンクを削除し、関連するリソースを解放
-//   i2c_cmd_link_delete(cmd);
-
-//   if (ret != ESP_OK)
-//   {
-//     ESP_LOGE(TAG, "Failed to read Chip ID with error code.");
-//     return ret;
-//   }
-
-//   if (*chip_id != CHIP_ID_EXPECTED)
-//   {
-//     ESP_LOGE(TAG, "Chip ID is: 0x%02X, NOT BMP180!", *chip_id);
-//     return ESP_ERR_INVALID_RESPONSE;
-//   }
-
-//   ESP_LOGI(TAG, "Read Chip ID: 0x%02X", *chip_id);
-//   return ESP_OK;
-// }
-
 static esp_err_t read_chip_id(uint8_t *chip_id)
 {
   esp_err_t ret;
-  uint8_t reg_addr = CHIP_ID_REG_ADDR; // チップIDのレジスタアドレス
+  uint8_t reg_addr = CHIP_ID_REG_ADDR;
 
   ret = bmp180_master_write_slave(I2C_NUM_0, &reg_addr, 1);
   if (ret != ESP_OK)
@@ -293,9 +227,9 @@ esp_err_t initialize_i2c_master(void)
 {
   i2c_config_t conf = {
       .mode = I2C_MODE_MASTER,
-      .sda_io_num = I2C_MASTER_SDA_IO, // Serial Data(データ用の信号線)を22に対応させる
+      .sda_io_num = I2C_MASTER_SDA_IO,
       .sda_pullup_en = GPIO_PULLUP_ENABLE,
-      .scl_io_num = I2C_MASTER_SCL_IO, // Serial Clock(クロック用の信号線)を21に対応させる
+      .scl_io_num = I2C_MASTER_SCL_IO,
       .scl_pullup_en = GPIO_PULLUP_ENABLE,
       .master.clk_speed = I2C_MASTER_FREQ_HZ,
   };
