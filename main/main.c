@@ -176,7 +176,7 @@ static esp_err_t bmp180_read_coefficients(i2c_port_t i2c_num, uint8_t *coefficie
   return ESP_OK;
 }
 
-void parse_bmp180_coefficients(uint8_t *coefficients)
+static void parse_bmp180_coefficients(uint8_t *coefficients)
 {
   AC1 = (coefficients[0] << 8) | coefficients[1];
   AC2 = (coefficients[2] << 8) | coefficients[3];
@@ -223,7 +223,7 @@ static esp_err_t read_chip_id(uint8_t *chip_id)
   return ESP_OK;
 }
 
-esp_err_t initialize_i2c_master(void)
+static esp_err_t initialize_i2c_master(void)
 {
   i2c_config_t conf = {
       .mode = I2C_MODE_MASTER,
@@ -253,7 +253,7 @@ esp_err_t initialize_i2c_master(void)
   return ESP_OK;
 }
 
-void compute(int16_t ut, uint32_t up)
+static void compute(int16_t ut, uint32_t up)
 {
   int32_t X1, X2, X3, B3, B5, B6, p;
   uint32_t B4, B7;
