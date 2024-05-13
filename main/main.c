@@ -54,10 +54,8 @@ static esp_err_t bmp180_master_read_slave(i2c_port_t i2c_num, uint8_t *data_rd, 
   i2c_master_write_byte(cmd, (BMP180_ADDRESS << 1) | I2C_MASTER_READ, ACK_CHECK_EN);
   if (size > 1)
   {
-    // 最後のバイトデータ以外読み込んでACKを送信する
     i2c_master_read(cmd, data_rd, size - 1, I2C_MASTER_ACK);
   }
-  // 最後のバイトデータを読み込んだあとNACKを送信する
   i2c_master_read_byte(cmd, data_rd + size - 1, I2C_MASTER_NACK);
   i2c_master_stop(cmd);
   esp_err_t ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_PERIOD_MS);
